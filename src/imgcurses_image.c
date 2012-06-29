@@ -5,6 +5,32 @@
 
 #include "imgcurses_image.h"
 
+void image_swap_red_blue(image_t img) {
+  for(int x = 0; x < img.width; x++)
+  for(int y = 0; y < img.height; y++) {
+    color_t col = image_get(img, x, y);
+    int r = col.r;
+    col.r = col.b;
+    col.b = r;
+    image_set(img, x, y, col);
+  }
+}
+
+void image_flip_vertical(image_t img) {
+
+  int x, y;
+  for (x = 0; x < img.width; x++)
+  for (y = 0; y < img.height / 2; y++) {
+     
+     color_t top = image_get(img, x, y);
+     color_t bottom = image_get(img, x, (img.height-1) - y);
+     
+     image_set(img, x, y, bottom);
+     image_set(img, x, (img.height-1) - y, top);
+  }
+
+}
+
 image_t image_load(const char* filename) {
   
   char* ext = strrchr(filename, '.');
@@ -40,28 +66,33 @@ image_t image_load(const char* filename) {
   img.data = malloc(height * width * sizeof(color_t));
   
 	if (depth == 24) {
-	
+	  
 	  fseek(f, 18, SEEK_SET);
 	  fread(img.data, width * height * sizeof(color_t), 1, f);
   
 	} else {
-	
+	  
     unsigned char* data = malloc(width * height * 4);
     
     fseek(f, 18, SEEK_SET);
     fread(data, width * height * 4, 1, f);
 	  
 	  /* Swap red blue */
-	  for(int i = 0; i < width * height; i++) {
-	    img.data[i].r = data[i*4+2];
-	    img.data[i].g = data[i*4+1];
-	    img.data[i].b = data[i*4+0];
+	  for(int x = 0; x < width; x++)
+	  for(int y = 0; y < height; y++) {
+	    color_t c = color_new(data[x*4 + y*4*width + 0],
+	                          data[x*4 + y*4*width + 1],
+	                          data[x*4 + y*4*width + 2]);
+	    image_set(img, x, y, c);
 	  }
 	  
 	  free(data);
 	}
   
   fclose(f);
+  
+  image_swap_red_blue(img);
+  image_flip_vertical(img);
   
   return img;
 }
@@ -76,6 +107,20 @@ color_t image_get(image_t img, int u, int v) {
   if (u > img.width) { return color_black(); }
   if (v > img.height) { return color_black(); }
   return img.data[u + v * img.width];
+}
+
+void image_set(image_t img, int u, int v, color_t val) {
+  if (u < 0) { return; }
+  if (v < 0) { return; }
+  if (u > img.width) { return; }
+  if (v > img.height) { return; }
+  img.data[u + v * img.width] = val;
+}
+
+bool image_sub_contained(image_t img, int u1, int v1, int u2, int v2) {
+  
+	return !( u1 > img.width || u2 < 0 || v1 > img.height || v2 < 0);
+  
 }
 
 color_t image_sub_get(image_t img, int u1, int v1, int u2, int v2) {
@@ -100,4 +145,10 @@ color_t image_sub_get(image_t img, int u1, int v1, int u2, int v2) {
   return color_new(r, g, b); 
 }
 
+float image_filesize(image_t img) {
+  
+  int bytes = img.width * img.height * 4;
+  return (float)bytes / 1000; 
+  
+}
 

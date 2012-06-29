@@ -58,22 +58,79 @@ int color_difference(color_t c1, color_t c2) {
          abs(c1.b - c2.b);
 }
 
-int closest_color_index(color_config_t config, color_t color) {
+bool color_equ(color_t c1, color_t c2) {
+  return (c1.r == c2.r) && (c1.g == c2.g) && (c1.b == c2.b);
+}
+
+static float blend_amount(color_t actual, color_t primary, color_t secondary) {
   
-  int best_diff = 9999;
-  int best_index = 0;
+  float primary_diff = color_difference(actual, primary);
+  float secondary_diff = color_difference(actual, secondary);
+  
+  return primary_diff / secondary_diff;
+  
+}
+
+color_info_t color_info(color_config_t config, color_t c) {
+  
+  int primary_diff = 9999;
+  int primary_index = 0;
   
   for (int i = 0; i < 8; i++) {
     
-    int diff = color_difference(color, config[i]);
+    int diff = color_difference(c, config[i]);
     
-    if (diff < best_diff) {
-      best_diff = diff;
-      best_index = i;
+    if (diff < primary_diff) {
+      primary_diff = diff;
+      primary_index = i;
     }
   }
   
-  return best_index;
+  int secondary_diff = 9999;
+  int secondary_index = 0;
+  
+  for (int i = 0; i < 8; i++) {
+    
+    if (i == primary_index) continue;
+    
+    int diff = color_difference(c, config[i]);
+    
+    if (diff < secondary_diff) {
+      secondary_diff = diff;
+      secondary_index = i;
+    }
+  }
+  
+  int tertiary_diff = 9999;
+  int tertiary_index = 0;
+  
+  for (int i = 0; i < 8; i++) {
+    
+    if (i == primary_index) continue;
+    if (i == secondary_index) continue;
+    
+    int diff = color_difference(c, config[i]);
+    
+    if (diff < secondary_diff) {
+      tertiary_diff = diff;
+      tertiary_index = i;
+    }
+  }
+  
+  color_info_t info;
+  info.primary = primary_index;
+  info.secondary = secondary_index;
+  info.tertiary = tertiary_index;
+  
+  float value = 0;
+  value += c.r; value += c.g; value += c.b;
+  value /= (3 * 255);
+  
+  info.value = value;
+  info.secondary_amount = blend_amount(c, config[primary_index], config[secondary_index]);
+  info.tertiary_amount = blend_amount(c, config[primary_index], config[tertiary_index]);
+  
+  return info;
   
 }
 

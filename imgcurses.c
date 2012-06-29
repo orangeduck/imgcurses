@@ -1,31 +1,49 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
-#include <locale.h>
 #include <ncurses.h>
 
 #include "imgcurses_color.h"
 #include "imgcurses_image.h"
 #include "imgcurses_config.h"
+#include "imgcurses_ascii.h"
+#include "imgcurses_view.h"
 
 static image_t img = {0};
+static image_t img_charset = {0};
+static charset_t charset = {0};
 static float zoom = 1.0;
-static float offset_x = 0.0;
-static float offset_y = 0.0;
+static int offset_x = 0;
+static int offset_y = 0;
 
-#define QUALITY_LOW 0
-#define QUALITY_HIGH 1
+static int view_index = 0;
 
-static int quality = QUALITY_LOW;
+#define views_count 4
+static view_t views_list[views_count];
 
-void event(int key) {
+static bool running = true;
 
+static void start_color_pairs() {
+
+  static int index = 0;
+  
+  for(int back = 0; back < 8; back++)
+  for(int fore = 0; fore < 8; fore++) {
+    init_pair(index, back, fore);
+    index++;
+  }
+
+}
+
+void event() {
+  
+  int key = getch();
+  
   switch(key) {
-    case KEY_LEFT:  offset_x -= 1.0; break;
-    case KEY_RIGHT: offset_x += 1.0; break;
-    case KEY_UP:    offset_y -= 1.0; break;
-    case KEY_DOWN:  offset_y += 1.0; break;
+    case KEY_LEFT:  offset_x -= 1.64; break;
+    case KEY_RIGHT: offset_x += 1.64; break;
+    case KEY_UP:    offset_y -= 1.64; break;
+    case KEY_DOWN:  offset_y += 1.64; break;
     
     case KEY_BACKSPACE:
       offset_x = 0.0;
@@ -33,57 +51,41 @@ void event(int key) {
       zoom = 1.0;
     break;
     
-    case ']': zoom += 0.1; break;
-    case '[': zoom -= 0.1; break;
-    
-    case 'r':
-      if (quality == QUALITY_LOW) { quality = QUALITY_HIGH; }
-      else if (quality == QUALITY_HIGH) { quality = QUALITY_LOW; }
+    case ']':
+      zoom += 0.1;
     break;
+    case '[':
+      zoom -= 0.1;
+    break;
+    
+    case 'm':
+      view_index++;
+      if (view_index == views_count) { view_index = 0; }
+    break;
+    
+    case 'q': running = false; break;
     
   }
   
   zoom = zoom <= 0.1 ? 0.1 : zoom;
+  zoom = zoom >= 5.0 ? 5.0 : zoom;
   
 }
 
-void render_low() {
-  
-  init_pair(0, COLOR_BLACK, COLOR_BLACK);
-  init_pair(1, COLOR_BLACK, COLOR_RED);
-  init_pair(2, COLOR_BLACK, COLOR_GREEN);
-  init_pair(3, COLOR_BLACK, COLOR_YELLOW);
-  init_pair(4, COLOR_BLACK, COLOR_BLUE);
-  init_pair(5, COLOR_BLACK, COLOR_MAGENTA);
-  init_pair(6, COLOR_BLACK, COLOR_CYAN);
-  init_pair(7, COLOR_BLACK, COLOR_WHITE);
+void render() {
   
   int max_x, max_y;
   getmaxyx(stdscr, max_y, max_x);
   
-  for(int x = 0; x < max_x; x++)
-  for(int y = 0; y < max_y-1; y++) {
-    
-    int u1 = (x + offset_x) * (1/zoom) * pixel_ubuntu.width;
-    int v1 = (y + offset_y) * (1/zoom) * pixel_ubuntu.height;
-    
-    int u2 = (x+1 + offset_x) * (1/zoom) * pixel_ubuntu.width;
-    int v2 = (y+1 + offset_y) * (1/zoom) * pixel_ubuntu.height;
-    
-    color_t texel = image_sub_get(img, u1, v1, u2, v2);
-    int closest = closest_color_index(colors_ubuntu, texel);
-    
-    attron(COLOR_PAIR(closest));
-    mvaddch(y, x, ' ');
-    attroff(COLOR_PAIR(closest));
-    
-  } 
-  
-  printw("%i%% +/- ", (int)roundf(zoom * 100));
-  
-}
+  view_t view = views_list[view_index];
 
-void render_high() {
+  for(int x = 0; x < max_x; x++) {
+    for(int y = 0; y < max_y-1; y++) {
+      view.view_func(img, charset, x, y, offset_x, offset_y, zoom);
+    } 
+  }
+  
+  printw("%i x %i pixels  %0.1f kB  %i%% ", img.width, img.height, image_filesize(img), (int)roundf(zoom * 100));
   
 }
 
@@ -94,11 +96,16 @@ int main(int argc, char** argv) {
     exit(0);
   }
   
+  views_list[0] = view_solid;
+  views_list[1] = view_value;
+  views_list[2] = view_color;
+  views_list[3] = view_detail;
+  
   img = image_load(argv[1]);
+  img_charset = image_load("ubuntu_charset.tga");
+  charset = charset_load(img_charset, pixel_ubuntu);
   
   initscr();
-  
-  setlocale(LC_ALL, "");
   
 	if(!has_colors()) {
     endwin();
@@ -107,35 +114,25 @@ int main(int argc, char** argv) {
   }
   
   start_color();
+  start_color_pairs();
   
   cbreak();
   keypad(stdscr, TRUE);
   noecho();
+  curs_set(0);
   
-  render_low();
-  refresh();
-      
-  while (1) {
+  while (running) {
     
-    int key = getch();
-    if (key == 'q') {
-      break;
-    }
-    
-    event(key);
-    
-    if (quality == QUALITY_LOW) {
-      render_low();
-    } else if (quality == QUALITY_HIGH) {
-      render_high();
-    }
-    
+    render();
     refresh();
+    event();
+    
   }
   
   endwin();
   
   image_delete(img);
+  image_delete(img_charset);
   
   return 0;
 }
