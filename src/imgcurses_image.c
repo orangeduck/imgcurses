@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "imgcurses_image.h"
+#include "imgcurses.h"
 
 void image_swap_red_blue(image_t img) {
   for(int x = 0; x < img.width; x++)
@@ -93,6 +93,15 @@ image_t image_load(const char* filename) {
   
   image_swap_red_blue(img);
   image_flip_vertical(img);
+  
+  for(int x = 0; x < width; x++)
+  for(int y = 0; y < height; y++) {
+    color_t c = image_get(img, x, y);
+    c.r *= 1.0;
+    c.g *= 1.0;
+    c.b *= 0.75;
+    image_set(img, x, y, c);
+  }
   
   return img;
 }

@@ -1,25 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include <ncurses.h>
 
-#include "imgcurses_color.h"
-#include "imgcurses_image.h"
-#include "imgcurses_config.h"
-#include "imgcurses_ascii.h"
-#include "imgcurses_view.h"
-
-static image_t img = {0};
-static image_t img_charset = {0};
-static charset_t charset = {0};
-static float zoom = 1.0;
-static int offset_x = 0;
-static int offset_y = 0;
-
-static int view_index = 0;
-
-#define views_count 4
-static view_t views_list[views_count];
+#include "imgcurses.h"
 
 static bool running = true;
 
@@ -35,15 +20,15 @@ static void start_color_pairs() {
 
 }
 
-void event() {
+static void event() {
   
   int key = getch();
   
   switch(key) {
-    case KEY_LEFT:  offset_x -= 1.64; break;
-    case KEY_RIGHT: offset_x += 1.64; break;
-    case KEY_UP:    offset_y -= 1.64; break;
-    case KEY_DOWN:  offset_y += 1.64; break;
+    case KEY_LEFT:  offset_x -= 2.0; break;
+    case KEY_RIGHT: offset_x += 2.0; break;
+    case KEY_UP:    offset_y -= 2.0; break;
+    case KEY_DOWN:  offset_y += 2.0; break;
     
     case KEY_BACKSPACE:
       offset_x = 0.0;
@@ -52,27 +37,26 @@ void event() {
     break;
     
     case ']':
+      if (zoom >= 4.9) break;
       zoom += 0.1;
     break;
     case '[':
+      if (zoom <= 0.1) break;
       zoom -= 0.1;
     break;
     
     case 'm':
       view_index++;
-      if (view_index == views_count) { view_index = 0; }
+      if (view_index == VIEW_COUNT) { view_index = 0; }
     break;
     
     case 'q': running = false; break;
     
   }
   
-  zoom = zoom <= 0.1 ? 0.1 : zoom;
-  zoom = zoom >= 5.0 ? 5.0 : zoom;
-  
 }
 
-void render() {
+static void render() {
   
   int max_x, max_y;
   getmaxyx(stdscr, max_y, max_x);
@@ -85,7 +69,10 @@ void render() {
     } 
   }
   
-  printw("%i x %i pixels  %0.1f kB  %i%% ", img.width, img.height, image_filesize(img), (int)roundf(zoom * 100));
+  for(int x = 0; x < max_x; x++) { mvaddch(max_y - 1, x, ' '); }
+  
+  mvprintw(max_y - 1, 0, "%i x %i pixels  %0.1f kB  %i%% ", img.width, img.height, image_filesize(img), (int)roundf(zoom * 100));
+  mvprintw(max_y - 1, max_x - strlen(view.view_name), "%s", view.view_name);
   
 }
 
@@ -103,7 +90,7 @@ int main(int argc, char** argv) {
   
   img = image_load(argv[1]);
   img_charset = image_load("ubuntu_charset.tga");
-  charset = charset_load(img_charset, pixel_ubuntu);
+  charset = charset_load(img_charset);
   
   initscr();
   

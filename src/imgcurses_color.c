@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "imgcurses_color.h"
+#include "imgcurses.h"
 
 color_t color_new(unsigned char r, unsigned char g, unsigned char b) {
   color_t col;
@@ -71,14 +71,14 @@ static float blend_amount(color_t actual, color_t primary, color_t secondary) {
   
 }
 
-color_info_t color_info(color_config_t config, color_t c) {
+color_info_t color_info(color_t c) {
   
   int primary_diff = 9999;
   int primary_index = 0;
   
   for (int i = 0; i < 8; i++) {
     
-    int diff = color_difference(c, config[i]);
+    int diff = color_difference(c, colors_default[i]);
     
     if (diff < primary_diff) {
       primary_diff = diff;
@@ -93,7 +93,7 @@ color_info_t color_info(color_config_t config, color_t c) {
     
     if (i == primary_index) continue;
     
-    int diff = color_difference(c, config[i]);
+    int diff = color_difference(c, colors_default[i]);
     
     if (diff < secondary_diff) {
       secondary_diff = diff;
@@ -101,34 +101,16 @@ color_info_t color_info(color_config_t config, color_t c) {
     }
   }
   
-  int tertiary_diff = 9999;
-  int tertiary_index = 0;
-  
-  for (int i = 0; i < 8; i++) {
-    
-    if (i == primary_index) continue;
-    if (i == secondary_index) continue;
-    
-    int diff = color_difference(c, config[i]);
-    
-    if (diff < secondary_diff) {
-      tertiary_diff = diff;
-      tertiary_index = i;
-    }
-  }
-  
   color_info_t info;
   info.primary = primary_index;
   info.secondary = secondary_index;
-  info.tertiary = tertiary_index;
   
   float value = 0;
   value += c.r; value += c.g; value += c.b;
   value /= (3 * 255);
   
   info.value = value;
-  info.secondary_amount = blend_amount(c, config[primary_index], config[secondary_index]);
-  info.tertiary_amount = blend_amount(c, config[primary_index], config[tertiary_index]);
+  info.secondary_amount = blend_amount(c, colors_default[primary_index], colors_default[secondary_index]);
   
   return info;
   

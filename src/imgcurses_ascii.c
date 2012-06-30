@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "imgcurses_ascii.h"
+#include "imgcurses.h"
 
 void mask_delete(mask_t mask) {
   free(mask.data);
@@ -50,14 +50,14 @@ float mask_coverage(mask_t mask) {
   return total / (mask.width * mask.height);
 }
 
-charset_t charset_load(image_t img, pixconf_t pixconf) {
+charset_t charset_load(image_t img) {
   
-  if (img.width != charset_char_count * pixconf.width) {
+  if (img.width != charset_char_count * CHAR_WIDTH) {
     printf("Badly formed charset image width\n");
     exit(1);
   }
   
-  if (img.height != pixconf.height) {
+  if (img.height != CHAR_HEIGHT) {
     printf("Badly formed charset image height\n");
     exit(1);
   }
@@ -67,8 +67,8 @@ charset_t charset_load(image_t img, pixconf_t pixconf) {
   cs.masks = malloc(sizeof(mask_t) * cs.num_masks);
   cs.coverages = malloc(sizeof(float) * cs.num_masks);
   
-  int width = pixconf.width;
-  int height = pixconf.height;
+  int width = CHAR_WIDTH;
+  int height = CHAR_HEIGHT;
   
   float best_coverage = 0;
   
@@ -80,7 +80,7 @@ charset_t charset_load(image_t img, pixconf_t pixconf) {
     for(int x = 0; x < width; x++)
     for(int y = 0; y < height; y++) {
       color_t col = image_get(img, (i*width) + x, y);
-      if (col.r > 64) {
+      if (col.r > 32) {
         mask_set(cs.masks[i], x, y, true);
       } else {
         mask_set(cs.masks[i], x, y, false);
@@ -126,18 +126,28 @@ char charset_char_for_coverage(charset_t set, float coverage) {
   
 }
 
-char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, image_t img, int u1, int v1, int u2, int v2) {
+int charset_char_id(charset_t set, char c) {
   
-  static const float constrast = 1.25;
+  for(int i = 0; i < charset_char_count; i++) {
+    if (c == charset_chars[i]) { return i; }
+  }
+  
+  return 0;
+  
+}
+
+char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, image_t img, int u1, int v1, int u2, int v2) {
   
   if (info.secondary_amount < 0.5) { return ' '; }
   if (info.secondary_amount > 0.9) { return '@'; }
   
+  static const float contrast = 1.25;
+  
   int sub_width = (u2 - u1);
   int sub_height = (v2 - v1);
   
-  color_t pri_col = colors_ubuntu[info.primary];
-  color_t snd_col = colors_ubuntu[info.secondary];
+  color_t pri_col = colors_default[info.primary];
+  color_t snd_col = colors_default[info.secondary];
   
   int best_id = 1;
   float best_score = 0;
@@ -156,7 +166,7 @@ char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, im
       color_t pix = image_get(img, u1 + u_fac * sub_width, v1 + v_fac * sub_height);
       
       bool mask_pix = mask_get(mask, x, y);
-      bool pri_pix = (color_difference(pix, pri_col) * constrast) < color_difference(pix, snd_col);
+      bool pri_pix = (color_difference(pix, pri_col) * contrast) < color_difference(pix, snd_col);
       
       score += mask_pix ^ pri_pix;
     }
