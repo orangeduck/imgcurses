@@ -2,6 +2,7 @@
 #define imgcurses_h
 
 #include <stdbool.h>
+#include <ncurses.h>
 
 /*
 ** Constants
@@ -14,14 +15,9 @@
 ** Colors
 */
 
-typedef union {
-  struct {
-    unsigned char r, g, b;
-  };
-  unsigned char rgb[3];
+typedef struct {
+  unsigned char r, g, b;
 } color_t;
-
-typedef color_t color_config_t[8];
 
 color_t color_new(unsigned char r, unsigned char g, unsigned char b);
 color_t color_black();
@@ -36,15 +32,6 @@ bool color_equ(color_t c1, color_t t2);
 
 int color_difference(color_t c1, color_t c2);
 
-typedef struct {
-  int primary;
-  int secondary;
-  float secondary_amount;
-  float value;
-} color_info_t;
-
-color_info_t color_info(color_t c);
-
 /*
 ** Color Configurations in order:
 **
@@ -52,12 +39,21 @@ color_info_t color_info(color_t c);
 ** BLUE MAGENTA CYAN WHITE
 */
 
-static color_config_t colors_default = {
-  {{ 46,  52,  54}}, {{204,   0,   0}}, 
-  {{78,   154,  6}}, {{196, 160,   0}}, 
-  {{ 52, 101, 164}}, {{117,  80, 123}}, 
-  {{  6, 152, 154}}, {{211, 215, 207}}
+static const color_t colors_default[8] = {
+  { 46,  52,  54}, {204,   0,   0}, 
+  {78,   154,  6}, {196, 160,   0}, 
+  { 52, 101, 164}, {117,  80, 123}, 
+  {  6, 152, 154}, {211, 215, 207}
 };
+
+typedef struct {
+  int primary;
+  int secondary;
+  float secondary_amount;
+  float value;
+} color_info_t;
+
+color_info_t color_info(const color_t config[8], color_t c);
 
 /*
 ** Images
@@ -129,13 +125,13 @@ char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, im
 
 typedef struct {
   char* view_name;
-  void (*view_func)(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
+  chtype (*view_func)(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
 } view_t;
 
-void view_func_solid(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
-void view_func_value(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
-void view_func_color(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
-void view_func_detail(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
+chtype view_func_solid(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
+chtype view_func_value(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
+chtype view_func_color(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
+chtype view_func_detail(image_t img, charset_t charset, int x, int y, int off_x, int off_y, float zoom);
 
 static view_t view_solid = {"Solid", view_func_solid};
 static view_t view_value = {"Value", view_func_value};

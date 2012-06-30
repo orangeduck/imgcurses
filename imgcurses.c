@@ -6,7 +6,182 @@
 
 #include "imgcurses.h"
 
+#define BUFF_STAT_DIRTY 0
+#define BUFF_STAT_CLEAN 1
+#define BUFF_STAT_COPY 2
+
+typedef struct {
+  char status;
+  short copy_x, copy_y;
+} buff_stat;
+
+static chtype* front_buffer = NULL;
+static chtype* back_buffer = NULL;
+
+static chtype* curr_buffer = NULL;
+static chtype* alt_buffer = NULL;
+
+static buff_stat* status_buffer = NULL;
+
+static int buffer_width = 0;
+static int buffer_height = 0;
+
+static void flip_buffer() {
+  
+  for(int x = 0; x < buffer_width; x++) {
+    for(int y = 0; y < buffer_height; y++) {
+      mvaddch(y, x, curr_buffer[x + buffer_width * y]);
+    } 
+  }
+  
+  if (curr_buffer == front_buffer) {
+    curr_buffer = back_buffer;
+    alt_buffer = front_buffer;
+  } else if (curr_buffer == back_buffer) {
+    curr_buffer = front_buffer;
+    alt_buffer = back_buffer;
+  }
+  
+}
+
+static void update_buffer() {
+  
+  view_t view = views_list[view_index];
+  chtype chattr;
+  
+  for(int x = 0; x < buffer_width; x++) {
+    for(int y = 0; y < buffer_height; y++) {
+  
+      buff_stat stat = status_buffer[x + buffer_width * y];
+      
+      switch(stat.status) {
+        case BUFF_STAT_DIRTY:
+          
+          chattr = view.view_func(img, charset, x, y, offset_x, offset_y, zoom);
+          
+          curr_buffer[x + buffer_width * y] = chattr;
+          status_buffer[x + buffer_width * y].status = BUFF_STAT_CLEAN;
+        break;
+        
+        case BUFF_STAT_COPY:
+          
+          chattr = alt_buffer[stat.copy_x + buffer_width * stat.copy_y];
+          
+          curr_buffer[x + buffer_width * y] = chattr;
+          status_buffer[x + buffer_width * y].status = BUFF_STAT_CLEAN;
+          
+        break;
+      }
+      
+    }
+  }
+  
+}
+
+static void dirty_buffer() {
+  memset(status_buffer, 0, sizeof(buff_stat) * buffer_width * buffer_height);
+}
+
+static void offset_buffer(int offset_x, int offset_y) {
+  
+  for(int x = 0; x < buffer_width; x++) {
+    for(int y = 0; y < buffer_height; y++) {
+      
+      int g_offset_x = x + offset_x;
+      int g_offset_y = y + offset_y;
+      
+      if ((g_offset_x < 0) || (g_offset_x >= buffer_width) || 
+          (g_offset_y < 0) || (g_offset_y >= buffer_height)) {
+          
+        status_buffer[x + buffer_width * y].status = BUFF_STAT_DIRTY;  
+        
+      } else {
+      
+        status_buffer[x + buffer_width * y].status = BUFF_STAT_COPY;
+        status_buffer[x + buffer_width * y].copy_x = g_offset_x;
+        status_buffer[x + buffer_width * y].copy_y = g_offset_y;
+        
+      }
+
+    }
+  }
+  
+}
+
+static void render() {
+  
+  int max_x, max_y;
+  getmaxyx(stdscr, max_y, max_x);
+  
+  if ((max_x != buffer_width) || (max_y-1 != buffer_height)) {
+    
+    buffer_width = max_x;
+    buffer_height = max_y-1;
+    
+    front_buffer = realloc(front_buffer, sizeof(chtype) * buffer_width * buffer_height);
+    back_buffer = realloc(back_buffer, sizeof(chtype) * buffer_width * buffer_height);
+    
+    curr_buffer = front_buffer;
+    alt_buffer = back_buffer;
+    
+    status_buffer = realloc(status_buffer, sizeof(buff_stat) * buffer_width * buffer_height);
+    dirty_buffer();
+  }
+
+
+  update_buffer();
+  flip_buffer();
+  
+  for(int x = 0; x < max_x; x++) { mvaddch(max_y - 1, x, ' '); }
+  
+  view_t view = views_list[view_index];
+  mvprintw(max_y - 1, 0, "%i x %i pixels  %0.1f kB  %i%% ", img.width, img.height, image_filesize(img), (int)roundf(zoom * 100));
+  mvprintw(max_y - 1, max_x - strlen(view.view_name), "%s", view.view_name);
+  
+}
+
 static bool running = true;
+
+static void event() {
+  
+  int key = getch();
+  
+  switch(key) {
+    case KEY_LEFT:  offset_x -= 2; offset_buffer(-2, 0); break;
+    case KEY_RIGHT: offset_x += 2; offset_buffer( 2, 0); break;
+    case KEY_UP:    offset_y -= 2; offset_buffer(0, -2); break;
+    case KEY_DOWN:  offset_y += 2; offset_buffer(0,  2); break;
+    
+    case KEY_BACKSPACE:
+      offset_x = 0.0;
+      offset_y = 0.0;
+      zoom = 1.0;
+      dirty_buffer(); 
+    break;
+    
+    case ']':
+      if (zoom >= 4.9) break;
+      zoom += 0.1; dirty_buffer();
+    break;
+    
+    case '[':
+      if (zoom <= 0.1) break;
+      zoom -= 0.1; dirty_buffer();
+    break;
+    
+    case 'm':
+      view_index++;
+      if (view_index == VIEW_COUNT) { view_index = 0; }
+      dirty_buffer();
+    break;
+    
+    case 'q':
+      running = false;
+    break;
+    
+  }
+  
+}
 
 static void start_color_pairs() {
 
@@ -20,61 +195,6 @@ static void start_color_pairs() {
 
 }
 
-static void event() {
-  
-  int key = getch();
-  
-  switch(key) {
-    case KEY_LEFT:  offset_x -= 2.0; break;
-    case KEY_RIGHT: offset_x += 2.0; break;
-    case KEY_UP:    offset_y -= 2.0; break;
-    case KEY_DOWN:  offset_y += 2.0; break;
-    
-    case KEY_BACKSPACE:
-      offset_x = 0.0;
-      offset_y = 0.0;
-      zoom = 1.0;
-    break;
-    
-    case ']':
-      if (zoom >= 4.9) break;
-      zoom += 0.1;
-    break;
-    case '[':
-      if (zoom <= 0.1) break;
-      zoom -= 0.1;
-    break;
-    
-    case 'm':
-      view_index++;
-      if (view_index == VIEW_COUNT) { view_index = 0; }
-    break;
-    
-    case 'q': running = false; break;
-    
-  }
-  
-}
-
-static void render() {
-  
-  int max_x, max_y;
-  getmaxyx(stdscr, max_y, max_x);
-  
-  view_t view = views_list[view_index];
-
-  for(int x = 0; x < max_x; x++) {
-    for(int y = 0; y < max_y-1; y++) {
-      view.view_func(img, charset, x, y, offset_x, offset_y, zoom);
-    } 
-  }
-  
-  for(int x = 0; x < max_x; x++) { mvaddch(max_y - 1, x, ' '); }
-  
-  mvprintw(max_y - 1, 0, "%i x %i pixels  %0.1f kB  %i%% ", img.width, img.height, image_filesize(img), (int)roundf(zoom * 100));
-  mvprintw(max_y - 1, max_x - strlen(view.view_name), "%s", view.view_name);
-  
-}
 
 int main(int argc, char** argv) {	
   
@@ -89,14 +209,14 @@ int main(int argc, char** argv) {
   views_list[3] = view_detail;
   
   img = image_load(argv[1]);
-  img_charset = image_load("ubuntu_charset.tga");
+  img_charset = image_load("default_charset.tga");
   charset = charset_load(img_charset);
   
   initscr();
   
 	if(!has_colors()) {
     endwin();
-    printf("Your terminal does not support color\n");
+    printf("Your terminal does not support colors!\n");
     exit(1);
   }
   

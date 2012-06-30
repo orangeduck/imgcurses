@@ -71,14 +71,14 @@ static float blend_amount(color_t actual, color_t primary, color_t secondary) {
   
 }
 
-color_info_t color_info(color_t c) {
+color_info_t color_info(const color_t config[8], color_t c) {
   
   int primary_diff = 9999;
   int primary_index = 0;
   
   for (int i = 0; i < 8; i++) {
     
-    int diff = color_difference(c, colors_default[i]);
+    int diff = color_difference(c, config[i]);
     
     if (diff < primary_diff) {
       primary_diff = diff;
@@ -93,7 +93,7 @@ color_info_t color_info(color_t c) {
     
     if (i == primary_index) continue;
     
-    int diff = color_difference(c, colors_default[i]);
+    int diff = color_difference(c, config[i]);
     
     if (diff < secondary_diff) {
       secondary_diff = diff;
@@ -110,7 +110,7 @@ color_info_t color_info(color_t c) {
   value /= (3 * 255);
   
   info.value = value;
-  info.secondary_amount = blend_amount(c, colors_default[primary_index], colors_default[secondary_index]);
+  info.secondary_amount = blend_amount(c, config[primary_index], config[secondary_index]);
   
   return info;
   
