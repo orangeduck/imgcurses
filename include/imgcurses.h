@@ -39,11 +39,18 @@ int color_difference(color_t c1, color_t c2);
 ** BLUE MAGENTA CYAN WHITE
 */
 
-static const color_t colors_default[8] = {
+static const color_t colors_ubuntu[8] = {
   { 46,  52,  54}, {204,   0,   0}, 
   {78,   154,  6}, {196, 160,   0}, 
   { 52, 101, 164}, {117,  80, 123}, 
   {  6, 152, 154}, {211, 215, 207}
+};
+
+static const color_t colors_default[8] = {
+  {  0,   0,   0}, {187,   0,   0},
+  {  0, 187,   0}, {187, 187,   0},
+  {  0,   0, 187}, {187,   0, 187},
+  {  0, 187, 187}, {187, 187, 187}
 };
 
 typedef struct {
