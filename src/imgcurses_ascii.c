@@ -50,6 +50,42 @@ float mask_coverage(mask_t mask) {
   return total / (mask.width * mask.height);
 }
 
+static void charset_write_header(charset_t cs) {
+
+  FILE* f = fopen("./include/imgcurses_charset.h", "w");
+  
+  fprintf(f, "#ifndef imgcurses_charset_h\n#define imgcurses_charset_h\n\n#include <stdbool.h>\n\n");
+  
+  fprintf(f, "static const mask_t* charset_default_masks = {\n");
+  
+  for(int i = 0; i < cs.num_masks; i++) {
+    
+    int count = cs.masks[i].width * cs.masks[i].height;
+  
+    fprintf(f, "{%i, %i, (bool*)\"", cs.masks[i].width, cs.masks[i].height);
+    for(int j = 0; j < count-1; j++) { fprintf(f, "\\%i", (int)cs.masks[i].data[j]); } fprintf(f,"\\%i", (int)cs.masks[i].data[count-1]);
+    
+    if (i == cs.num_masks-1) {
+      fprintf(f, "\"}\n");
+    } else {
+      fprintf(f, "\"},\n");
+    }
+  }
+  
+  fprintf(f, "};\n\n");
+  
+  fprintf(f, "static const float* charset_default_coverages = {");
+  for(int i = 0; i < cs.num_masks-1; i++) { fprintf(f, "%0.2f,", cs.coverages[i]); if (i % 10 == 0) { fprintf(f,"\n"); } }
+  fprintf(f, "%0.2f};\n\n", cs.coverages[cs.num_masks-1]);
+  
+  fprintf(f, "static const charset_t charset_default = {94, charset_default_coverages, charset_default_masks};\n\n");
+  
+  fprintf(f, "#endif\n");
+  
+  fclose(f);
+
+}
+
 charset_t charset_load(image_t img) {
   
   if (img.width != charset_char_count * CHAR_WIDTH) {

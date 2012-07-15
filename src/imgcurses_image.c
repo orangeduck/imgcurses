@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <png.h>
+#include <jpeglib.h>
+
 #include "imgcurses.h"
 
 void image_swap_red_blue(image_t img) {
@@ -31,15 +34,131 @@ void image_flip_vertical(image_t img) {
 
 }
 
-image_t image_load(const char* filename) {
+static image_t image_load_jpeg(const char* filename) {
   
-  char* ext = strrchr(filename, '.');
+	struct jpeg_decompress_struct cinfo;
+	struct jpeg_error_mgr jerr;
+	
+	JSAMPROW row_pointer[1];
+	
+  FILE* f = fopen(filename, "rb");
+	if (f == NULL) {
+    printf("Cannot open file %s\n", filename);
+    exit(1);
+	}
+	
+	cinfo.err = jpeg_std_error(&jerr);
   
-  if ( ext == NULL || strcmp(ext, ".tga") != 0) {
-    printf("Can only load .tga files!\n");
+	jpeg_create_decompress(&cinfo);
+	jpeg_stdio_src(&cinfo, f);
+	jpeg_read_header(&cinfo, TRUE);
+	
+	int width = cinfo.image_width;
+	int height = cinfo.image_height;
+	int channels = cinfo.num_components;
+	
+	jpeg_start_decompress(&cinfo);
+
+	unsigned char* raw_image = malloc(width * height * channels);
+	row_pointer[0] = malloc(width * 3);
+	
+	int loc = 0;
+	while (cinfo.output_scanline < height) {
+    jpeg_read_scanlines(&cinfo, (JSAMPARRAY)row_pointer, 1);
+    for(int x=0; x < width * channels; x++) {
+      raw_image[loc++] = row_pointer[0][x];
+    }
+	}
+	
+	jpeg_finish_decompress(&cinfo);
+	jpeg_destroy_decompress(&cinfo);
+	free(row_pointer[0]);
+	
+	fclose(f);
+  
+  image_t img;
+  img.width = width;
+  img.height = height;
+  img.data = (color_t*)raw_image;
+  
+  return img;
+}
+
+static image_t image_load_png(const char* filename) {
+  
+  FILE* f = fopen(filename, "rb");
+	if (f == NULL) {
+    printf("Cannot open file %s\n", filename);
+    exit(1);
+	}
+	
+	unsigned char header[8];
+  fread(header, 1, 8, f);
+  
+  if (png_sig_cmp(header, 0, 8)) {
+    printf("Error loading file %s. Bad header.\n", filename);
     exit(1);
   }
   
+  png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);;
+  png_infop info_ptr = png_create_info_struct(png_ptr);
+  
+  png_init_io(png_ptr, f);
+  png_set_sig_bytes(png_ptr, 8);
+  png_read_info(png_ptr, info_ptr);
+
+  int width = png_get_image_width(png_ptr, info_ptr);
+  int height = png_get_image_height(png_ptr, info_ptr);
+  int color_type = png_get_color_type(png_ptr, info_ptr);
+  int bit_depth = png_get_bit_depth(png_ptr, info_ptr);
+  
+  int num_passes = png_set_interlace_handling(png_ptr);
+  png_read_update_info(png_ptr, info_ptr);
+
+  png_bytep* row_data = malloc(sizeof(png_bytep) * height);
+  for (int y=0; y<height; y++) {
+    row_data[y] = malloc(png_get_rowbytes(png_ptr,info_ptr));
+  }
+  
+  png_read_image(png_ptr, row_data);
+
+  fclose(f);
+  
+  image_t img;
+  img.width = width;
+  img.height = height;
+  img.data = malloc(width * height * sizeof(color_t));
+  
+  int channels;
+  if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGBA) {
+    channels = 4;
+  } else if (png_get_color_type(png_ptr, info_ptr) == PNG_COLOR_TYPE_RGB) {
+    channels = 3;
+  } else {
+    printf("Error loading file %s. Unknown color type.\n", filename);
+    exit(1);
+  }
+  
+  for (int y=0; y < height; y++) {
+    for (int x=0; x < width; x++) {
+      png_byte* row = row_data[y];
+      png_byte* ptr = &(row[x*channels]);
+      image_set(img, x, y, color_new(ptr[0], ptr[1], ptr[2]));
+    }
+  }
+  
+  for (int y=0; y<height; y++) {
+    free(row_data[y]);
+  }
+  free(row_data);
+  
+  return img;
+  
+}
+
+static image_t image_load_tga(const char* filename) {
+  
+
   FILE* f = fopen(filename, "rb");
 	if (f == NULL) {
     printf("Cannot open file %s\n", filename);
@@ -63,7 +182,7 @@ image_t image_load(const char* filename) {
   image_t img;
   img.width = width;
   img.height = height;
-  img.data = malloc(height * width * sizeof(color_t));
+  img.data = malloc(width * height * sizeof(color_t));
   
 	if (depth == 24) {
 	  
@@ -94,16 +213,26 @@ image_t image_load(const char* filename) {
   image_swap_red_blue(img);
   image_flip_vertical(img);
   
-  for(int x = 0; x < width; x++)
-  for(int y = 0; y < height; y++) {
-    color_t c = image_get(img, x, y);
-    c.r *= 1.0;
-    c.g *= 1.0;
-    c.b *= 0.75;
-    image_set(img, x, y, c);
+  return img;
+}
+
+image_t image_load(const char* filename) {
+
+  char* ext = strrchr(filename, '.');
+  
+  if (ext == NULL) {
+    printf("Cannot load file %s\n", filename);
+    exit(1);
   }
   
-  return img;
+  if (strcmp(ext, ".tga") == 0) { return image_load_tga(filename); }
+  if (strcmp(ext, ".png") == 0) { return image_load_png(filename); }
+  if (strcmp(ext, ".jpeg") == 0) { return image_load_jpeg(filename); }
+  if (strcmp(ext, ".jpg") == 0) { return image_load_jpeg(filename); }
+  
+  printf("Cannot load file %s. Unknown file extension %s.\n", filename, ext);
+  exit(1);
+
 }
 
 void image_delete(image_t img) {

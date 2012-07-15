@@ -119,6 +119,8 @@ char charset_char_for_coverage(charset_t set, float coverage);
 
 char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, image_t img, int u1, int v1, int u2, int v2);
 
+#include "imgcurses_charset.h"
+
 /*
 ** Views
 */
@@ -147,8 +149,6 @@ static int offset_x = 0;
 static int offset_y = 0;
 
 static image_t img = {0};
-static image_t img_charset = {0};
-static charset_t charset = {0};
 
 static int view_index = 0;
 

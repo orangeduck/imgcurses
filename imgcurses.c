@@ -57,7 +57,7 @@ static void update_buffer() {
       switch(stat.status) {
         case BUFF_STAT_DIRTY:
           
-          chattr = view.view_func(img, charset, x, y, offset_x, offset_y, zoom);
+          chattr = view.view_func(img, charset_default, x, y, offset_x, offset_y, zoom);
           
           curr_buffer[x + buffer_width * y] = chattr;
           status_buffer[x + buffer_width * y].status = BUFF_STAT_CLEAN;
@@ -209,8 +209,6 @@ int main(int argc, char** argv) {
   views_list[3] = view_detail;
   
   img = image_load(argv[1]);
-  img_charset = image_load("default_charset.tga");
-  charset = charset_load(img_charset);
   
   initscr();
   
@@ -239,7 +237,6 @@ int main(int argc, char** argv) {
   endwin();
   
   image_delete(img);
-  image_delete(img_charset);
   
   return 0;
 }
