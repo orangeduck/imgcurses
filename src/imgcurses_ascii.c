@@ -172,7 +172,7 @@ int charset_char_id(charset_t set, char c) {
   
 }
 
-char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, image_t img, int u1, int v1, int u2, int v2) {
+char charset_image_sub_match(charset_t set, color_t texel, color_config_t* config, color_info_t info, image_t img, int u1, int v1, int u2, int v2) {
   
   if (info.secondary_amount < 0.5) { return ' '; }
   if (info.secondary_amount > 0.9) { return '@'; }
@@ -182,8 +182,8 @@ char charset_image_sub_match(charset_t set, color_t texel, color_info_t info, im
   int sub_width = (u2 - u1);
   int sub_height = (v2 - v1);
   
-  color_t pri_col = colors_default[info.primary];
-  color_t snd_col = colors_default[info.secondary];
+  color_t pri_col = (*config)[info.primary];
+  color_t snd_col = (*config)[info.secondary];
   
   int best_id = 1;
   float best_score = 0;

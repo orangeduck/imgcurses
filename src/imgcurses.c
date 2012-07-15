@@ -26,6 +26,8 @@ static buff_stat* status_buffer = NULL;
 static int buffer_width = 0;
 static int buffer_height = 0;
 
+static color_config_t config;
+
 static void flip_buffer() {
   
   for(int x = 0; x < buffer_width; x++) {
@@ -57,7 +59,7 @@ static void update_buffer() {
       switch(stat.status) {
         case BUFF_STAT_DIRTY:
           
-          chattr = view.view_func(img, charset_default, x, y, offset_x, offset_y, zoom);
+          chattr = view.view_func(img, charset_default, &config, x, y, offset_x, offset_y, zoom);
           
           curr_buffer[x + buffer_width * y] = chattr;
           status_buffer[x + buffer_width * y].status = BUFF_STAT_CLEAN;
@@ -196,6 +198,19 @@ static void start_color_pairs() {
 }
 
 
+static void start_color_config() {
+  
+  short r, g, b;
+  
+  for(int i = 0; i < 8; i++) {
+    color_content(i, &r, &g, &b);
+    config[i] = color_new(255 * ((float)r / 1000.0f), 
+                          255 * ((float)g / 1000.0f), 
+                          255 * ((float)b / 1000.0f));         
+  } 
+  
+}
+
 int main(int argc, char** argv) {	
   
   if (argc != 2) {
@@ -220,6 +235,7 @@ int main(int argc, char** argv) {
   
   start_color();
   start_color_pairs();
+  start_color_config();
   
   cbreak();
   keypad(stdscr, TRUE);
