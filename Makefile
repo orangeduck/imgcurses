@@ -1,3 +1,4 @@
+PREFIX?=/usr
 CC=gcc
 OUT=imgcurses
 INCS=-I./include
@@ -19,3 +20,6 @@ obj:
 	
 clean:
 	rm $(OUT) $(OBJ_FILES)
+install: $(OUT)
+	install -d $(DESTDIR)/$(PREFIX)/bin/
+	install $(OUT) $(DESTDIR)/$(PREFIX)/bin/
