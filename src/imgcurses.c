@@ -144,15 +144,26 @@ static void render() {
 
 static bool running = true;
 
+static void move_cursor_left()  { offset_x -= 2; offset_buffer(-2, 0); }
+static void move_cursor_right() { offset_x += 2; offset_buffer( 2, 0); }
+static void move_cursor_up()    { offset_y -= 2; offset_buffer(0, -2); }
+static void move_cursor_down()  { offset_y += 2; offset_buffer(0,  2); }
+
 static void event() {
-  
+
   int key = getch();
   
   switch(key) {
-    case KEY_LEFT:  offset_x -= 2; offset_buffer(-2, 0); break;
-    case KEY_RIGHT: offset_x += 2; offset_buffer( 2, 0); break;
-    case KEY_UP:    offset_y -= 2; offset_buffer(0, -2); break;
-    case KEY_DOWN:  offset_y += 2; offset_buffer(0,  2); break;
+    case KEY_LEFT:  move_cursor_left(); break;
+    case KEY_RIGHT: move_cursor_right(); break;
+    case KEY_UP:    move_cursor_up(); break;
+    case KEY_DOWN:  move_cursor_down(); break;
+
+    /* vi key-bindings */
+    case 'h': move_cursor_left(); break;
+    case 'j': move_cursor_down(); break;
+    case 'k': move_cursor_up(); break;
+    case 'l': move_cursor_right(); break;
     
     case KEY_BACKSPACE:
       offset_x = 0.0;
